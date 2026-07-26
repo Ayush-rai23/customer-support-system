@@ -1,0 +1,5 @@
+# Secrets / local tool config
+.mcp.json
+.vscode/mcp.json
+*.env
+.env.*
