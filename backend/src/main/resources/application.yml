@@ -50,11 +50,20 @@ spring:
 
 server:
   port: 8080
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: lax
 
 app:
   jwt:
     secret: ${JWT_SECRET:change-this-dev-only-secret-change-this-dev-only-secret}
     expiration-ms: 86400000
+  admin:
+    default-email: ${ADMIN_DEFAULT_EMAIL:admin@support.local}
+    default-password: ${ADMIN_DEFAULT_PASSWORD:changeme}
   support-inbox-address: ${SUPPORT_INBOX_ADDRESS:support@example.com}
   ai:
     confidence-threshold: 0.75
