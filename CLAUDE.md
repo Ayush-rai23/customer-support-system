@@ -29,6 +29,7 @@ npm run dev       # dev server on port 5173, proxies /api/* to localhost:8080
 npm run build     # production build
 npm run lint      # oxlint
 npm run preview   # preview a production build
+npm run test:e2e  # Playwright e2e tests (see Testing section below)
 ```
 
 ## Architecture
@@ -62,6 +63,16 @@ Actuator is exposed at `/actuator/*` with only `health` and `info` included (`ma
 ### Database
 
 PostgreSQL, native Windows install (not Docker) — service `postgresql-x64-18`, default port 5432, database name `support_system`. Managed via pgAdmin4. `spring.jpa.hibernate.ddl-auto` is `update`, so entities auto-migrate the schema on backend startup once they exist — no migration tool (e.g. Flyway/Liquibase) is set up.
+
+## Testing
+
+Three tiers exist so far, covering the session-auth feature — extend the same pattern as new features get built rather than introducing new test tooling per-feature.
+
+- **Backend unit** (`backend/src/test/java/.../service/AdminUserDetailsServiceTest.java`) — plain Mockito (`@ExtendWith(MockitoExtension.class)`), no Spring context, no DB. JUnit 5, Mockito, and AssertJ come transitively from the existing `spring-boot-starter-*-test` modular test starters in `pom.xml` — no extra test dependency needed for this tier.
+- **Backend integration** (`backend/src/test/java/.../controller/AuthControllerIntegrationTest.java`) — `@SpringBootTest(webEnvironment = WebEnvironment.MOCK)` + `@AutoConfigureMockMvc`, exercising the real Spring Security filter chain via `MockMvc`. Runs against the **same local Postgres dev database** as `spring-boot:run` (no H2/Testcontainers) — deliberately simple since the app already requires Postgres to start at all. Requires `DB_PASSWORD` set in the environment, same as running the app. In Spring Boot 4's modular test-starter layout, `@AutoConfigureMockMvc` lives at `org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc` (not the classic `org.springframework.boot.test.autoconfigure.web.servlet` package) — easy to get wrong from memory/older docs. There is no autowired `ObjectMapper` bean available in this test context; build JSON request bodies as plain strings instead of using Jackson.
+  - **IntelliJ gotcha**: run configurations don't inherit the shell's environment variables. If a backend integration test fails in IntelliJ with a Postgres `password authentication failed` error (often surfaced as `ApplicationContext failure threshold (1) exceeded` on later tests in the same class — that's just Spring's context-cache guard hiding the real first failure), set `DB_PASSWORD` under Run → Edit Configurations → (the test config, or the JUnit template so it applies to all) → Environment variables.
+- **E2E** (`frontend/e2e/auth.spec.js`, config in `frontend/playwright.config.js`) — Playwright, Chromium only (`@playwright/test` devDependency). Run `npx playwright install chromium` once per machine. `playwright.config.js` has no `webServer` auto-start — both the backend (`:8080`, needs Postgres + `DB_PASSWORD`) and frontend (`:5173`) must already be running before `npm run test:e2e`, per this project's normal dev workflow. Hardcodes the seeded default admin credentials (`admin@support.local` / `changeme`, matching `application.yml`'s `app.admin.default-*` defaults).
+- **No frontend unit tests** (no Vitest/RTL) by deliberate choice — thin context/hook layers like `AuthContext` are already covered by the backend integration tests + e2e; add a frontend test framework only when component logic actually warrants it, not preemptively.
 
 ## Origin / how this was scaffolded
 

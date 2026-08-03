@@ -3,3 +3,6 @@
 .vscode/mcp.json
 *.env
 .env.*
+
+# Editor
+.idea/
