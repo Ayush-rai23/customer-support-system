@@ -43,6 +43,13 @@ public class AuthController {
                     loginRequest.email(), loginRequest.password());
             Authentication authentication = authenticationManager.authenticate(token);
 
+            // Rotate the session id on successful login to prevent session fixation.
+            // Manual authentication bypasses Spring Security's SessionAuthenticationStrategy,
+            // so a pre-existing (attacker-fixed) JSESSIONID would otherwise stay valid.
+            if (request.getSession(false) != null) {
+                request.changeSessionId();
+            }
+
             SecurityContext context = SecurityContextHolder.createEmptyContext();
             context.setAuthentication(authentication);
             SecurityContextHolder.setContext(context);
@@ -59,9 +66,8 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> me(@AuthenticationPrincipal AdminPrincipal principal) {
-        if (principal == null) {
-            return ResponseEntity.status(401).build();
-        }
+        // SecurityConfig requires authentication for /api/auth/me, so the filter chain
+        // returns 401 before this runs — principal is guaranteed non-null here.
         return ResponseEntity.ok(Map.of(
                 "id", principal.getAdmin().getId(),
                 "email", principal.getAdmin().getEmail()));
