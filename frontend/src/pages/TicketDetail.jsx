@@ -13,6 +13,8 @@ import { TICKET_STATUS_ORDER, statusLabel } from '../constants/ticketStatus'
 import StatusBadge from '../components/StatusBadge'
 
 const UNASSIGNED = '-1'
+const REPLY_MIN_LENGTH = 20
+const REPLY_MAX_LENGTH = 700
 
 export default function TicketDetail() {
   const { id } = useParams()
@@ -50,10 +52,14 @@ export default function TicketDetail() {
     }
   }
 
+  const replyLength = reply.trim().length
+  const replyTooShort = replyLength > 0 && replyLength < REPLY_MIN_LENGTH
+  const replyValid = replyLength >= REPLY_MIN_LENGTH && replyLength <= REPLY_MAX_LENGTH
+
   async function handleReply(e) {
     e.preventDefault()
-    if (!reply.trim()) return
-    await run(() => replyToTicket(id, reply))
+    if (!replyValid) return
+    await run(() => replyToTicket(id, reply.trim()))
     setReply('')
   }
 
@@ -130,14 +136,24 @@ export default function TicketDetail() {
             <textarea
               value={reply}
               onChange={(e) => setReply(e.target.value)}
-              placeholder="Write a reply to the customer…"
+              placeholder="Write a reply to the customer… (min 20 characters)"
               rows={4}
+              maxLength={REPLY_MAX_LENGTH}
               className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-2 text-sm text-[var(--color-ink)]"
             />
-            <div className="mt-2 flex justify-end">
+            <div className="mt-2 flex items-center justify-between">
+              <span
+                className={`text-xs ${
+                  replyTooShort ? 'text-[var(--color-status-escalated)]' : 'text-[var(--color-ink-muted)]'
+                }`}
+              >
+                {replyTooShort
+                  ? `${REPLY_MIN_LENGTH - replyLength} more characters needed`
+                  : `${replyLength}/${REPLY_MAX_LENGTH}`}
+              </span>
               <button
                 type="submit"
-                disabled={busy || !reply.trim()}
+                disabled={busy || !replyValid}
                 className="rounded-md bg-[var(--color-brand-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-brand-700)] disabled:opacity-60"
               >
                 Send reply
