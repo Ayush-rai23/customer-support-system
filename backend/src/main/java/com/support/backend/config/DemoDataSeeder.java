@@ -11,9 +11,13 @@ import com.support.backend.repository.AdminRepository;
 import com.support.backend.repository.CategoryRepository;
 import com.support.backend.repository.TicketMessageRepository;
 import com.support.backend.repository.TicketRepository;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +27,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Seeds reference categories and a set of sample tickets so the admin UI has
@@ -58,14 +63,15 @@ public class DemoDataSeeder {
             CategoryRepository categoryRepository,
             TicketRepository ticketRepository,
             TicketMessageRepository messageRepository,
-            AdminRepository adminRepository) {
+            AdminRepository adminRepository,
+            JdbcTemplate jdbcTemplate) {
         return args -> {
             Map<String, Category> cat = seedCategories(categoryRepository);
             if (ticketRepository.count() > 0) {
                 return;
             }
             Admin admin = adminRepository.findAll().stream().findFirst().orElse(null);
-            var seeder = new TicketSeeder(ticketRepository, messageRepository, admin);
+            var seeder = new TicketSeeder(ticketRepository, messageRepository, jdbcTemplate, admin, new Random());
 
             seeder.create("Cannot log in to my account", "sarah.jones@example.com", "Sarah Jones",
                     TicketStatus.ESCALATED, cat.get("Account"), false,
@@ -195,11 +201,13 @@ public class DemoDataSeeder {
                 .collect(Collectors.toMap(Category::getName, c -> c));
     }
 
-    /** Small helper that persists a ticket plus its message thread. */
+    /** Small helper that persists a ticket plus its message thread, then backdates timestamps. */
     private record TicketSeeder(
             TicketRepository ticketRepository,
             TicketMessageRepository messageRepository,
-            Admin admin) {
+            JdbcTemplate jdbcTemplate,
+            Admin admin,
+            Random random) {
 
         void create(String subject, String email, String name, TicketStatus status,
                 Category category, boolean assigned, Msg... messages) {
@@ -222,7 +230,44 @@ public class DemoDataSeeder {
                         .body(m.body())
                         .build());
             }
-            messageRepository.saveAll(thread);
+            List<TicketMessage> saved = messageRepository.saveAll(thread);
+            backdate(ticket, saved);
+        }
+
+        /**
+         * createdAt/updatedAt are Hibernate-managed (updatable = false), so this bypasses
+         * JPA with raw SQL updates to spread seeded timestamps across the last ~14 days —
+         * otherwise every seeded ticket lands in the same instant and dashboard trend
+         * charts show a single spike instead of real variation. Message order (inbound
+         * before any outbound reply) is preserved, with realistic reply gaps in between,
+         * so the average-response-time metric comes out sensible too.
+         */
+        private void backdate(Ticket ticket, List<TicketMessage> messages) {
+            Instant now = Instant.now();
+            Instant ticketCreatedAt = now
+                    .minus(Duration.ofDays(random.nextInt(14)))
+                    .minus(Duration.ofHours(random.nextInt(24)))
+                    .minus(Duration.ofMinutes(random.nextInt(60)));
+
+            List<Instant> messageTimes = new ArrayList<>();
+            Instant cursor = ticketCreatedAt.plus(Duration.ofMinutes(random.nextInt(5)));
+            for (int i = 0; i < messages.size(); i++) {
+                if (i > 0) {
+                    cursor = cursor.plus(Duration.ofMinutes(15 + random.nextInt(8 * 60)));
+                }
+                if (cursor.isAfter(now)) {
+                    cursor = now;
+                }
+                messageTimes.add(cursor);
+            }
+            Instant updatedAt = messageTimes.get(messageTimes.size() - 1);
+
+            jdbcTemplate.update("UPDATE tickets SET created_at = ?, updated_at = ? WHERE id = ?",
+                    Timestamp.from(ticketCreatedAt), Timestamp.from(updatedAt), ticket.getId());
+            for (int i = 0; i < messages.size(); i++) {
+                jdbcTemplate.update("UPDATE ticket_messages SET created_at = ? WHERE id = ?",
+                        Timestamp.from(messageTimes.get(i)), messages.get(i).getId());
+            }
         }
     }
 }

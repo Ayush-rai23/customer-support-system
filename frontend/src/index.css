@@ -35,6 +35,14 @@
   --color-status-closed-bg: #f1f5f9;
   --color-status-spam: #9333ea;
   --color-status-spam-bg: #f3e8ff;
+
+  /* Dashboard category chart palette — validated categorical slots 1-5
+     (see dataviz skill), fixed order, distinct from status/brand hues. */
+  --color-chart-billing: #2a78d6;
+  --color-chart-technical: #eb6834;
+  --color-chart-account: #1baf7a;
+  --color-chart-general: #eda100;
+  --color-chart-feedback: #e87ba4;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -44,6 +52,12 @@
     --color-border: #232838;
     --color-ink: #e2e8f0;
     --color-ink-muted: #94a3b8;
+
+    --color-chart-billing: #3987e5;
+    --color-chart-technical: #d95926;
+    --color-chart-account: #199e70;
+    --color-chart-general: #c98500;
+    --color-chart-feedback: #d55181;
   }
 }
 
