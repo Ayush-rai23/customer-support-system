@@ -67,6 +67,10 @@ app:
   support-inbox-address: ${SUPPORT_INBOX_ADDRESS:support@example.com}
   ai:
     confidence-threshold: 0.75
+  seed:
+    # Seeds demo categories + sample tickets on startup (dev convenience).
+    # Set false for any non-dev deployment.
+    demo-data: ${SEED_DEMO_DATA:true}
 
 management:
   endpoints:

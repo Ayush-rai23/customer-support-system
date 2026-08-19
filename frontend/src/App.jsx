@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardLayout from './pages/DashboardLayout'
 import DashboardHome from './pages/DashboardHome'
 import DashboardTickets from './pages/DashboardTickets'
+import TicketDetail from './pages/TicketDetail'
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route index element={<Navigate to="home" replace />} />
         <Route path="home" element={<DashboardHome />} />
         <Route path="tickets" element={<DashboardTickets />} />
+        <Route path="tickets/:id" element={<TicketDetail />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
